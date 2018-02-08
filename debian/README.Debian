@@ -1,0 +1,15 @@
+trapdoor2 for Debian
+--------------------
+
+First: Read the README
+
+Second: The Trapdoor2 Debian Package cares of generating the needed
+SSL Files. If you want to change some of the Parameters of the generated
+certificate file edit /etc/td2/openssl.conf, rm /etc/td2/*.pem and rerun
+mktd2cert.
+
+To have a usable Trapdoor2 service you have to generate at least one cookie
+with 'gencookie'. You also need to create the 'td2' iptables chain.
+
+
+ -- Philipp Richter <philipp.richter@linbit.com>, Thu,  1 Jul 2004 13:47:01 +0200

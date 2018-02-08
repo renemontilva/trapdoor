@@ -1,0 +1,33 @@
+.\" (c) 2004 Andreas Krennmair <ak@synflood.at>
+.\" groff_man sucks, that's why I use groff_mdoc
+.Dd June 24, 2004
+.Dt GENCOOKIE 1
+.Os trapdoor2
+.Sh NAME
+.Nm gencookie
+.Nd generates magic cookie hashes for the td2 configuration file
+.Sh SYNOPSIS
+.Nm
+.Op magic cookie
+.Sh DESCRIPTION
+.Nm
+generates magic cookie hashes that are required for
+.Em auth
+configuration entries in
+.Xr td2.conf 5 .
+If the magic cookie is specified on the command line, it is being written
+to the standard output. If no magic cookie is specified, the user will
+be asked to enter the magic cookie using a password prompt. This means
+that the magic cookie which is being typed will not be printed on the
+screen. When the user hits hits the return key, the generated hash is
+being written to the standard output.
+.Pp
+.Nm
+uses the MD5 hashing algorithm in the same format as Apache 2's
+.Xr htpasswd 1 .
+.Sh SEE ALSO
+.Xr td2.conf 5 ,
+.Xr td2 8
+.Sh AUTHORS
+.An "Andreas Krennmair" Aq ak@synflood.at
+.An "Clifford Wolf" Aq clifford@clifford.at

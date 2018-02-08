@@ -1,0 +1,339 @@
+This is a patch for OpenSSH 3.8p1 by Clifford Wolf <clifford@clifford.at>
+=========================================================================
+
+This patch adds OpenCommand and CloseCommand keywords to ssh_config. This
+commands are run before the connection is established and after it has been
+closed. It can be used e.g. to open trapdoors or establish tunnels.
+
+
+ openssh-3.8p1/readconf.c   |   20 +++++++++-
+ openssh-3.8p1/readconf.h   |    2 +
+ openssh-3.8p1/ssh.0        |    2 +
+ openssh-3.8p1/ssh.1        |    2 +
+ openssh-3.8p1/ssh.c        |   10 +++++
+ openssh-3.8p1/ssh_config.0 |   13 ++++++
+ openssh-3.8p1/ssh_config.5 |   18 +++++++++
+ openssh-3.8p1/sshconnect.c |   87 +++++++++++++++++++++++++++++++++++++++++++++
+ openssh-3.8p1/sshconnect.h |    4 ++
+ 9 files changed, 156 insertions(+), 2 deletions(-)
+
+
+Index: ssh.1
+--- openssh-3.8p1.orig/ssh.1	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/ssh.1	(revision 25)
+@@ -614,6 +614,7 @@
+ .It CheckHostIP
+ .It Cipher
+ .It Ciphers
++.It CloseCommand
+ .It ClearAllForwardings
+ .It Compression
+ .It CompressionLevel
+@@ -639,6 +640,7 @@
+ .It MACs
+ .It NoHostAuthenticationForLocalhost
+ .It NumberOfPasswordPrompts
++.It OpenCommand
+ .It PasswordAuthentication
+ .It Port
+ .It PreferredAuthentications
+
+Index: sshconnect.h
+--- openssh-3.8p1.orig/sshconnect.h	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/sshconnect.h	(revision 25)
+@@ -34,6 +34,10 @@
+ };
+ 
+ int
++ssh_run_command(const char *type, const char *host, u_short port,
++    const char *run_command);
++
++int
+ ssh_connect(const char *, struct sockaddr_storage *, u_short, int, int,
+     int, const char *);
+ 
+
+Index: ssh.c
+--- openssh-3.8p1.orig/ssh.c	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/ssh.c	(revision 25)
+@@ -606,6 +606,11 @@
+ 	    strcmp(options.proxy_command, "none") == 0)
+ 		options.proxy_command = NULL;
+ 
++	/* Execute open command, if set */
++	if (options.open_command != NULL &&
++	    strcmp(options.open_command, "none") != 0)
++		ssh_run_command("open", host, options.port, options.open_command);
++
+ 	/* Open a connection to the remote host. */
+ 	if (ssh_connect(host, &hostaddr, options.port,
+ 	    options.address_family, options.connection_attempts,
+@@ -725,6 +730,11 @@
+ 	if (proxy_command_pid > 1)
+ 		kill(proxy_command_pid, SIGHUP);
+ 
++	/* Execute close command, if set */
++	if (options.close_command != NULL &&
++	    strcmp(options.close_command, "none") != 0)
++		ssh_run_command("close", host, options.port, options.close_command);
++
+ 	return exit_status;
+ }
+ 
+
+Index: ssh.0
+--- openssh-3.8p1.orig/ssh.0	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/ssh.0	(revision 25)
+@@ -354,6 +354,7 @@
+                    CheckHostIP
+                    Cipher
+                    Ciphers
++                   CloseCommand
+                    ClearAllForwardings
+                    Compression
+                    CompressionLevel
+@@ -379,6 +380,7 @@
+                    MACs
+                    NoHostAuthenticationForLocalhost
+                    NumberOfPasswordPrompts
++                   OpenCommand
+                    PasswordAuthentication
+                    Port
+                    PreferredAuthentications
+
+Index: readconf.h
+--- openssh-3.8p1.orig/readconf.h	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/readconf.h	(revision 25)
+@@ -72,6 +72,8 @@
+ 	char   *hostname;	/* Real host to connect. */
+ 	char   *host_key_alias;	/* hostname alias for .ssh/known_hosts */
+ 	char   *proxy_command;	/* Proxy command for connecting the host. */
++	char   *open_command;	/* Open command for before connecting the host. */
++	char   *close_command;	/* Close command for after connecting the host. */
+ 	char   *user;		/* User to log in as. */
+ 	int     escape_char;	/* Escape character; -2 = none */
+ 
+
+Index: readconf.c
+--- openssh-3.8p1.orig/readconf.c	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/readconf.c	(revision 25)
+@@ -93,7 +93,8 @@
+ 	oPasswordAuthentication, oRSAAuthentication,
+ 	oChallengeResponseAuthentication, oXAuthLocation,
+ 	oIdentityFile, oHostName, oPort, oCipher, oRemoteForward, oLocalForward,
+-	oUser, oHost, oEscapeChar, oRhostsRSAAuthentication, oProxyCommand,
++	oUser, oHost, oEscapeChar, oRhostsRSAAuthentication,
++	oOpenCommand, oCloseCommand, oProxyCommand,
+ 	oGlobalKnownHostsFile, oUserKnownHostsFile, oConnectionAttempts,
+ 	oBatchMode, oCheckHostIP, oStrictHostKeyChecking, oCompression,
+ 	oCompressionLevel, oTCPKeepAlive, oNumberOfPasswordPrompts,
+@@ -149,6 +150,8 @@
+ 	{ "identityfile2", oIdentityFile },			/* alias */
+ 	{ "hostname", oHostName },
+ 	{ "hostkeyalias", oHostKeyAlias },
++	{ "opencommand", oOpenCommand },
++	{ "closecommand", oCloseCommand },
+ 	{ "proxycommand", oProxyCommand },
+ 	{ "port", oPort },
+ 	{ "cipher", oCipher },
+@@ -537,10 +540,21 @@
+ 		charptr = &options->smartcard_device;
+ 		goto parse_string;
+ 
++	case oOpenCommand:
++	case oCloseCommand:
+ 	case oProxyCommand:
+ 		if (s == NULL)
+ 			fatal("%.200s line %d: Missing argument.", filename, linenum);
+-		charptr = &options->proxy_command;
++		switch (opcode) {
++		case oOpenCommand:
++			charptr = &options->open_command;
++			break;
++		case oCloseCommand:
++			charptr = &options->close_command;
++			break;
++		default:
++			charptr = &options->proxy_command;
++		}
+ 		len = strspn(s, WHITESPACE "=");
+ 		if (*activep && *charptr == NULL)
+ 			*charptr = xstrdup(s + len);
+@@ -853,6 +867,8 @@
+ 	options->num_identity_files = 0;
+ 	options->hostname = NULL;
+ 	options->host_key_alias = NULL;
++	options->open_command = NULL;
++	options->close_command = NULL;
+ 	options->proxy_command = NULL;
+ 	options->user = NULL;
+ 	options->escape_char = -1;
+
+Index: sshconnect.c
+--- openssh-3.8p1.orig/sshconnect.c	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/sshconnect.c	(revision 25)
+@@ -55,6 +55,93 @@
+ static void warn_changed_key(Key *);
+ 
+ /*
++ * Run the given command
++ */
++int
++ssh_run_command(const char *type, const char *host, u_short port, const char *run_command)
++{
++	Buffer command;
++	const char *cp;
++	char *command_string;
++	pid_t pid;
++	char strport[NI_MAXSERV];
++	int status;
++
++	/* Convert the port number into a string. */
++	snprintf(strport, sizeof strport, "%hu", port);
++
++	/*
++	 * Build the final command string in the buffer by making the
++	 * appropriate substitutions to the given proxy command.
++	 *
++	 * Use "exec" to avoid "sh -c" processes on some platforms
++	 * (e.g. Solaris)
++	 */
++	buffer_init(&command);
++	buffer_append(&command, "exec ", 5);
++
++	for (cp = run_command; *cp; cp++) {
++		if (cp[0] == '%' && cp[1] == '%') {
++			buffer_append(&command, "%", 1);
++			cp++;
++			continue;
++		}
++		if (cp[0] == '%' && cp[1] == 'h') {
++			buffer_append(&command, host, strlen(host));
++			cp++;
++			continue;
++		}
++		if (cp[0] == '%' && cp[1] == 'p') {
++			buffer_append(&command, strport, strlen(strport));
++			cp++;
++			continue;
++		}
++		buffer_append(&command, cp, 1);
++	}
++	buffer_append(&command, "\0", 1);
++
++	/* Get the final command string. */
++	command_string = buffer_ptr(&command);
++
++	debug("Executing %s command: %.500s", type, command_string);
++
++	/* Fork and execute the proxy command. */
++	if ((pid = fork()) == 0) {
++		char *argv[10];
++
++		/* Child.  Permanently give up superuser privileges. */
++		seteuid(original_real_uid);
++		setuid(original_real_uid);
++
++		argv[0] = _PATH_BSHELL;
++		argv[1] = "-c";
++		argv[2] = command_string;
++		argv[3] = NULL;
++
++		execv(argv[0], argv);
++		perror(argv[0]);
++		exit(1);
++	}
++	/* Parent. */
++	if (pid < 0)
++		fatal("fork failed: %.100s", strerror(errno));
++	else {
++		waitpid(pid, &status, 0);
++		if ( WIFSIGNALED(status) )
++			fatal("%s command '%.500s' failed: cought signal %d",
++					type, command_string, WTERMSIG(status));
++		if ( WEXITSTATUS(status) )
++			fatal("%s command '%.500s' failed: returned %d",
++					type, command_string, WEXITSTATUS(status));
++	}
++
++	/* Free the command name. */
++	buffer_free(&command);
++
++	/* Indicate OK return */
++	return 0;
++}
++/*
+  * Connect to the given ssh server using a proxy command.
+  */
+ static int
+
+Index: ssh_config.0
+--- openssh-3.8p1.orig/ssh_config.0	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/ssh_config.0	(revision 25)
+@@ -100,6 +100,13 @@
+              Specifies whether to use compression.  The argument must be
+              ``yes'' or ``no''.  The default is ``no''.
+ 
++     CloseCommand
++             Specifies the command to run after the connection to the server
++             has been closed.  The command string extends to the end of the
++             line, and is executed with /bin/sh.  In the command string, `%h'
++             will be substituted by the host name to connect and `%p' by the
++             port.
++
+      CompressionLevel
+              Specifies the compression level to use if compression is enabled.
+              The argument must be an integer from 1 (fast) to 9 (slow, best).
+@@ -273,6 +280,12 @@
+              Specifies the number of password prompts before giving up.  The
+              argument to this keyword must be an integer.  Default is 3.
+ 
++     OpenCommand
++             Specifies the command to run before the connection to the server
++             is opened.  The command string extends to the end of the line,
++             and is executed with /bin/sh.  In the command string, `%h' will
++             be substituted by the host name to connect and `%p' by the port.
++
+      PasswordAuthentication
+              Specifies whether to use password authentication.  The argument
+              to this keyword must be ``yes'' or ``no''.  The default is
+
+Index: ssh_config.5
+--- openssh-3.8p1.orig/ssh_config.5	(.../.transvn:beginning)	(revision 25)
++++ openssh-3.8p1/ssh_config.5	(revision 25)
+@@ -215,6 +215,15 @@
+ .Dq no .
+ The default is
+ .Dq no .
++.It Cm CloseCommand
++Specifies the command to run after the connection to the server has been closed.
++The command string extends to the end of the line, and is executed with
++.Pa /bin/sh .
++In the command string,
++.Ql %h
++will be substituted by the host name to connect and
++.Ql %p
++by the port.
+ .It Cm CompressionLevel
+ Specifies the compression level to use if compression is enabled.
+ The argument must be an integer from 1 (fast) to 9 (slow, best).
+@@ -446,6 +455,15 @@
+ Specifies the number of password prompts before giving up.
+ The argument to this keyword must be an integer.
+ Default is 3.
++.It Cm OpenCommand
++Specifies the command to run before the connection to the server is opened.
++The command string extends to the end of the line, and is executed with
++.Pa /bin/sh .
++In the command string,
++.Ql %h
++will be substituted by the host name to connect and
++.Ql %p
++by the port.
+ .It Cm PasswordAuthentication
+ Specifies whether to use password authentication.
+ The argument to this keyword must be
+
+
+
+Generated by Transvn 0.15.

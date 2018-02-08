@@ -1,0 +1,87 @@
+.\" (c) 2004 Andreas Krennmair <ak@synflood.at>
+.\" groff_man sucks, that's why I use groff_mdoc
+.Dd June 24, 2004
+.Dt TD2.CONF 5
+.Os trapdoor2
+.Sh NAME
+.Nm td2.conf
+.Nd configuration file for td2
+.Sh DESCRIPTION
+This man page describes the file format and the available configuration parameters for
+.Nm .
+.Sh FORMAT
+Empty lines and blank characters (space, tab) at the beginning of every line are ignored.
+.Pp
+If a # is encountered at the beginning of the line (it may be preceeded by blank characters), 
+the character and the rest of the line is ignored. It is generally used to include
+comments in the configuration file.
+.Pp
+Every line that is not empty and is not a comment is a configuration entry in the 
+following format:
+.Pa key = value
+.Pp
+.Sh CONFIGURATION KEYS
+.Bl -tag -width -compact
+.It listenhost
+specifies the IP address on which td2 shall listen. The listenhost
+.Em 0.0.0.0
+makes td2 listen on all IPv4-enabled interfaces, while
+.Em ::
+makes td2 listen on all IPv4- and IPv6-enabled interfaces (yes, td2 is IPv6-capable).
+The default is
+.Em 0.0.0.0 .
+.It listenport
+specifies the TCP port on which td2 shall listen. The default is 
+.Em 443
+(HTTPS).
+.It user
+specifies the user under which td2 shall run in the chroot environment. The default
+is 
+.Em nobody .
+.It group
+specifies the group under which td2 shall run in the chroot environment. The default
+is
+.Em nobody .
+.It chrootdir
+specifies the directory td2 shall
+.Xr chroot 2
+to. The default is
+.Pa /var/empty .
+.It certfile
+specifies the SSL certificate td2 shall use. It must be in PEM format and can be generated using e.g.
+.Xr openssl 1 .
+The default is
+.Pa /etc/td2/cert.pem .
+.It keyfile
+specifies the SSL key td2 shall use. It must be in PEM format and can be generated using e.g.
+.Xr openssl 1 .
+The default is
+.Pa /etc/td2/key.pem .
+.It auth
+specifies and authentication entry. An authentication entry consists of a hash value and a command
+that shall be executed, separated by a colon (`:'). The hash value contains the hash of a magic cookie,
+and can be generated using
+.Xr gencookie 1 .
+.Nm
+may contain one or more
+.Em auth
+entries.
+.It daemon
+specifies whether td2 shall put itself into background. The default is
+.Em no
+.It output
+specifies whether 
+.Em html
+or
+.Em wml
+shall be the default output. Please see
+.Xr td2 8
+for information on how to explicitly select one of the output format as user regardless 
+of the configured output format.
+.El
+.Sh SEE ALSO
+.Xr gencookie 1 ,
+.Xr td2 8
+.Sh AUTHORS
+.An "Andreas Krennmair" Aq ak@synflood.at
+.An "Clifford Wolf" Aq clifford@clifford.at

@@ -1,0 +1,48 @@
+trapdoor2 (1.6-1) unstable; urgency=low
+
+  * Version 1.6
+
+ -- Clifford Wolf <clifford@clifford.at>  Thu, 23 Apr 2009 12:50:00 +0200
+
+trapdoor2 (1.5-1) unstable; urgency=low
+
+  * Version 1.5
+
+ -- Clifford Wolf <clifford.wolf@linbit.com>  Thu, 26 Feb 2009 19:30:00 +0100
+
+trapdoor2 (1.4-1) unstable; urgency=low
+
+  * Version 1.4
+
+ -- Clifford Wolf <clifford.wolf@linbit.com>  Wed, 25 Feb 2009 12:25:00 +0100
+
+trapdoor2 (1.3-1) unstable; urgency=low
+
+  * Version 1.3
+
+ -- Clifford Wolf <clifford.wolf@linbit.com>  Tue, 22 Apr 2008 11:12:00 +0200
+
+trapdoor2 (1.2-1) unstable; urgency=low
+
+  * Version 1.2
+
+ -- Clifford Wolf <clifford.wolf@linbit.com>  Thu, 04 Nov 2004 11:12:00 +0200
+
+trapdoor2 (1.1-1) unstable; urgency=low
+
+  * Version 1.1
+
+ -- Clifford Wolf <clifford.wolf@linbit.com>  Tue,  6 Jul 2004 16:19:00 +0200
+
+trapdoor2 (1.0-svn20040706-1) unstable; urgency=low
+
+  * Updated svn repo.
+
+ -- Philipp Richter <philipp.richter@linbit.com>  Tue,  6 Jul 2004 14:28:00 +0200
+
+trapdoor2 (1.0-svn20040705-1) unstable; urgency=low
+
+  * Initial Release.
+
+ -- Philipp Richter <philipp.richter@linbit.com>  Thu,  1 Jul 2004 13:47:01 +0200
+

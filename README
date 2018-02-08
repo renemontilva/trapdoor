@@ -1,0 +1,71 @@
+###############################################################################
+#                                                                             #
+#  trapdoor2 - HTTPS trapdoor daemon                                          #
+#  Copyright (C) 2004  Andreas Krennmair <ak@synflood.at>                     #
+#  Copyright (C) 2004  Clifford Wolf <clifford@clifford.at>                   #
+#                                                                             #
+#  This program is free software; you can redistribute it and/or modify       #
+#  it under the terms of the GNU General Public License as published by       #
+#  the Free Software Foundation; either version 2 of the License, or          #
+#  (at your option) any later version.                                        #
+#                                                                             #
+#  This program is distributed in the hope that it will be useful,            #
+#  but WITHOUT ANY WARRANTY; without even the implied warranty of             #
+#  MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the              #
+#  GNU General Public License for more details.                               #
+#                                                                             #
+#  You should have received a copy of the GNU General Public License          #
+#  along with this program; if not, write to the Free Software                #
+#  Foundation, Inc., 59 Temple Place, Suite 330, Boston, MA  02111-1307  USA  #
+#                                                                             #
+###############################################################################
+
+trapdoor2 (td2) allows remote users to execute local commands by sending 'magic
+cookies'. this can e.g. be used to alter local firewalling rules so people can
+connect to local services after sending the magick cookie.
+
+td2 is implemented as high-secure https server. the daemon processes are
+running in a chroot jail with multiple rlimits set. even if td2 can be
+exploited (e.g. using a hypothetical security hole in the SSL implementation),
+it is very unlikely that the attacker can execute any commands on the machine
+and/or can cause any damage.
+
+however - there never is a 100% guarantee that a system is secure. we believe
+that trapdoor2 can be used to make systems more secure, but if you use it, you
+do so on your own risk.
+
+
+installing td2 is as easy as with most other packages:
+
+  ./configure && make && make install
+
+
+next a configuration file (/etc/td2/td2.conf) should be created:
+
+  daemon yes
+  listenport 8042
+
+  cookie demo
+	hash $apr1$js2YUvBw$TjD5hGjxWxJSJ3hSvSOqX1
+	command "/bin/bash /etc/td2/openport.sh 80 10 $IP"
+	response http://foobar.example.com/
+
+the first line will let td2 run in daemon-mode, the 2nd line specifies the tcp
+port and the remaining 4 lines that "openport.sh 80 10 $IP" should be executed
+when a cookie matching the given hash is received. The cookie hash can be
+created using gencookie(1). The response line is optional and contains a URL to
+which the user will be redirected if the request is authenticated successfully.
+
+more information about the config file format can be found in the example
+configuration file (/etc/td2/td2.conf.example) and td2.conf(5).
+
+
+at last a key and certificate for the https server needs to be created:
+
+  openssl genrsa -out /etc/td2/key.pem 1024
+  openssl req -new -key /etc/td2/key.pem -out /etc/td2/cert.csr
+  openssl x509 -req -days 7125 -in /etc/td2/cert.csr -signkey /etc/td2/key.pem -out /etc/td2/cert.pem
+
+
+simply executing 'td2' now will start the trapdoor2 daemon.
+

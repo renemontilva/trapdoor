@@ -1,0 +1,82 @@
+.\" (c) 2004 Andreas Krennmair <ak@synflood.at>
+.\" groff_man sucks, that's why I use groff_mdoc
+.Dd June 21, 2004
+.Dt TRAPDOOR2 8
+.Os trapdoor2
+.Sh NAME
+.Nm td2
+.Nd HTTPS trapdoor daemon
+.Sh SYNOPSIS
+.Nm
+.Op configfile
+.Sh DESCRIPTION
+.Nm
+is an HTTPS daemon that executes commands after a "magic cookie" has been provided. It takes
+one optional parameter, which is the path of the configuration file. When no configuration
+file is passed,
+.Pa /etc/td2/td2.conf
+is used.
+.Sh NOTES
+.Nm
+is an HTTPS-only daemon that executes custom commands after a certain URL,
+including a "magic cookie", has been called. It provides an HTML interface for normal
+web browsers and an WML interface for WAP-capable mobile phones. The default interface
+is configurable.
+The URL for the request is in the following format:
+.Pa https://HOST:PORT/?c=cookie .
+.Pp
+In this case, the configured interface will be used. It is also possible to explicitly
+select a certain interface, by calling
+.Pa https://HOST:PORT/html?c=cookie
+or
+.Pa https://HOST:PORT/wml?c=cookie .
+.Pp
+When no CGI parameters are being passed, an HTML form or a WML form will be generated
+where the magic cookie can be entered and sent to
+.Nm
+like a normal password.
+Each magic cookie is associated with a command. When a valid magic cookie is being
+received by
+.Nm ,
+the command that is associated with the cookie will be executed, and
+.Nm
+returns a success message via the chosen interface (HTML or WML). When an invalid magic cookie
+has been provided,
+.Nm
+returns an error message. The magic cookies are stored in the configuration
+file. For security reasons, they're stored as hash values from which they're
+difficult to revert back to plain text.
+.Pp
+To properly function as HTTPS daemon,
+.Nm
+needs to be provided with an SSL certificate and an SSL key. Unless specified differently in
+the configuration, the files
+.Pa /etc/td2/cert.pem
+and
+.Pa /etc/td2/key.pem
+are used as SSL certificate and SSL key.
+.Nm
+is of course configurable. All configuration information is stored in a configuration file. For
+more information on the configuration file format, see the
+.Xr td2.conf 5
+manual page.
+.Sh FILES
+.Bl -tag -width -compact
+.It /etc/td2/td2.conf
+td2 configuration file
+.It /etc/td2/cert.pem
+SSL certificate
+.It /etc/td2/key.pem
+SSL key
+.It /var/empty
+default chroot directory
+.El
+.Sh SEE ALSO
+.Xr gencookie 1 ,
+.Xr td2.conf 5
+.Sh HISTORY
+.Nm
+was preceded by trapdoor, which was telnet-based.
+.Sh AUTHORS
+.An "Andreas Krennmair" Aq ak@synflood.at
+.An "Clifford Wolf" Aq clifford@clifford.at

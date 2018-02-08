@@ -1,0 +1,15 @@
+#!/bin/bash
+
+test -x /usr/bin/openssl || exit 0
+
+if [ -f /etc/td2/cert.pem ] ; then
+	echo "/etc/td2/cert.pem already existent."
+	exit 1
+fi
+
+trap "rm -f /etc/td2/key.pem /etc/td2/cert.pem /etc/td2/cert.csr" EXIT
+openssl genrsa -out /etc/td2/key.pem 1024 || exit 1
+openssl req -new -config /etc/td2/openssl.conf -key /etc/td2/key.pem -out /etc/td2/cert.csr || exit 1
+openssl x509 -req -days 7125 -in /etc/td2/cert.csr -signkey /etc/td2/key.pem -out /etc/td2/cert.pem || exit 1
+rm -f /etc/td2/cert.csr
+trap "" EXIT

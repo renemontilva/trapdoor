@@ -1,0 +1,9 @@
+#!/bin/sh -e
+
+if [ "$1" = "purge" ]; then
+        rm -f /etc/td2/key.pem /etc/td2/cert.pem
+fi
+
+#DEBHELPER#
+
+exit 0

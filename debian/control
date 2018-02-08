@@ -1,0 +1,20 @@
+Source: trapdoor2
+Section: net
+Priority: optional
+Maintainer: Philipp Richter <philipp.richter@linbit.com>
+Build-Depends: debhelper (>> 3.0.0)
+Standards-Version: 3.5.2
+
+Package: trapdoor2
+Architecture: any
+Depends: ${shlibs:Depends}, curl
+Description: HTTPS trapdoor daemon
+ trapdoor2 (td2) allows remote users to execute local commands by sending 'magic
+ cookies'. this can e.g. be used to alter local firewalling rules so people can
+ connect to local services after sending the magick cookie.
+ .
+ td2 is implemented as high-secure https server. the daemon processes are
+ running in a chroot jail with multiple rlimits set. even if td2 can be
+ exploited (e.g. using a hypothetical security hole in the SSL implementation),
+ it is very unlikely that the attacker can execute any commands on the machine
+ and/or can cause any damage.

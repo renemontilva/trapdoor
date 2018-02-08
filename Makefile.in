@@ -1,0 +1,84 @@
+
+CC=@CC@
+CFLAGS=@CFLAGS@
+LDFLAGS=@LDFLAGS@
+LIBS=@LIBS@
+OUTPUT_TD2=td2
+OUTPUT_GENCOOKIE=gencookie
+OBJS_TD2=main.o http.o io.o apr_md5.o config.o signal.o tcp_listen.o hash.o syslog.o
+OBJS_GENCOOKIE=gencookie.o apr_md5.o
+RM=rm -rf
+INSTALL=@INSTALL@
+INSTALL_PROGRAM=@INSTALL_PROGRAM@
+INSTALL_DATA=@INSTALL_DATA@
+
+prefix=@prefix@
+exec_prefix=@exec_prefix@
+mandir=@mandir@
+sbindir=@sbindir@
+bindir=@bindir@
+confdir=@sysconfdir@/td2
+
+
+programs: $(OUTPUT_TD2) $(OUTPUT_GENCOOKIE)
+
+%.o: %.c
+	$(CC) $(CFLAGS) -DCONFDIR=\"$(confdir)\" -c $<
+
+$(OUTPUT_TD2): $(OBJS_TD2)
+	$(CC) $(CFLAGS) -o $(OUTPUT_TD2) $(OBJS_TD2) $(LIBS)
+
+$(OUTPUT_GENCOOKIE): $(OBJS_GENCOOKIE)
+	$(CC) $(CFLAGS) -o $(OUTPUT_GENCOOKIE) $(OBJS_GENCOOKIE) $(LIBS)
+
+hashprofile: hash.c
+	$(CC) $(CFLAGS) -DHASH_PROFILE_MAIN -o hashprofile hash.c
+
+splint:
+	splint -weak -unrecog -warnposix -D__gnuc_va_list=va_list -DCONFDIR=\"/etc/td2\" \
+		$(filter-out apr_md5.c, $(patsubst %.o,%.c, $(OBJS_TD2)))
+
+
+clean:
+	$(RM) $(OUTPUT_TD2) $(OUTPUT_GENCOOKIE) $(OBJS_TD2) $(OBJS_GENCOOKIE) hashprofile
+
+distclean: clean
+	$(RM) Makefile config.h config.status config.log autom4te.cache aclocal.m4
+
+totallyclean: distclean
+	$(RM) configure config.h.in install-sh
+
+
+install: install_programs install_man install_config
+
+install_programs: programs
+	mkdir -p $(DESTDIR)$(sbindir)
+	$(INSTALL) td2 $(DESTDIR)$(sbindir)
+	mkdir -p $(DESTDIR)$(bindir)
+	$(INSTALL) gencookie $(DESTDIR)$(bindir)
+	$(INSTALL) td2client.sh $(DESTDIR)$(bindir)/td2client
+
+install_man:
+	mkdir -p $(DESTDIR)$(mandir)/man1
+	mkdir -p $(DESTDIR)$(mandir)/man5
+	mkdir -p $(DESTDIR)$(mandir)/man8
+	$(INSTALL_DATA) gencookie.1 $(DESTDIR)$(mandir)/man1
+	$(INSTALL_DATA) td2.conf.5 $(DESTDIR)$(mandir)/man5
+	$(INSTALL_DATA) td2.8 $(DESTDIR)$(mandir)/man8
+
+install_config:
+	mkdir -p $(DESTDIR)$(confdir)
+	$(INSTALL_DATA) examples/openport.sh $(DESTDIR)$(confdir)/openport.sh
+	[ -f $(DESTDIR)$(confdir)/td2.conf ] || \
+		$(INSTALL_DATA) examples/td2.conf $(DESTDIR)$(confdir)/td2.conf
+	@echo ""
+	@echo "***************************************************"
+	@echo "You still need to create a configuration file $(DESTDIR)$(confdir)/td2.conf"
+	@echo "and an SSL certificate and key!  See README for details."
+	@echo "***************************************************"
+	@echo ""
+
+
+.PHONY: programs splint clean distclean totallyclean
+.PHONY: install install_programs install_man install_config
+

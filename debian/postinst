@@ -1,0 +1,10 @@
+#! /bin/sh -e
+
+if [ "$1" = "configure" ]; then
+    if ! grep -q "^trapdoor2" /etc/services ; then
+        echo "trapdoor2          8042/tcp" >>/etc/services
+    fi
+    test -f /etc/td2/cert.pem || /usr/sbin/mktd2cert
+fi
+
+#DEBHELPER#
