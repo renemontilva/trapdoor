@@ -36,6 +36,7 @@ extern char *chroot_dir;
 extern int output_type;
 
 static char *client_ip;
+static char forwarded_ip[10];
 
 static void drop_privileges(void)
 {
@@ -378,6 +379,8 @@ query_error:
 		/* read over HTTP headers until we reach a blank line */
 		do {
 			rc = ssl_readline(line, sizeof(line));
+			sscanf(line, "X-Forwarded-For: %s", &forwarded_ip);
+			printf("printing %s\n", forwarded_ip);
 		} while (rc > 0 && strcmp(line, "\r\n") != 0);
 	}
 	else
