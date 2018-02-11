@@ -36,7 +36,7 @@ extern char *chroot_dir;
 extern int output_type;
 
 static char *client_ip;
-static char forwarded_ip[10];
+static char forwarded_ip[16];
 
 static void drop_privileges(void)
 {
@@ -184,14 +184,17 @@ static void drop_privileges(void)
 }
 
 /* cookie auth dialog on child process */
-static int auth_cookie(char *c, int cl, int pipe_fds[])
+static int auth_cookie(char *c, int cl, char *ip, int ipl, int pipe_fds[])
 {
 	int ret = 1;
 
-	if (cl >= 100) return 1;
+	if (cl >= 100) return 1; // fail
 
 	(void) write(pipe_fds[1], &cl, sizeof(cl));
 	(void) write(pipe_fds[1], c, (size_t)cl);
+	(void) write(pipe_fds[1], &ipl, sizeof(ipl));
+	(void) write(pipe_fds[1], ip, (size_t)ipl);
+
 	(void) read(pipe_fds[0], &ret, sizeof(ret));
 
 	return ret;
@@ -259,6 +262,7 @@ static void run_command(char *cmd, char *ip)
 	int pid;
 	pid = fork();
 	if (pid == 0) {
+		printf("Somos unos mostro", ip);
 		char env_ip[20], env_cmd[strlen(cmd)+10];
 		char *const envp[] = { env_ip, env_cmd, "PATH=/bin:/usr/bin", 0 };
 		snprintf(env_cmd, sizeof(env_cmd), "CMD=%s", cmd);
@@ -276,11 +280,11 @@ static void run_command(char *cmd, char *ip)
 /* this is the cookie auth check on the daemon (parent) */
 static void handle_client_request(int pipe_fds[])
 {
-	int size;
-	int rc, ret = 1;
-	char buf[100], *cmd, *resp;
-
+	int size, size2;
+	int rc, rc2, ret = 1;
+	char buf[100], buf2[100], *cmd, *resp;
 	rc = (int)read(pipe_fds[0], &size, sizeof(size));
+	printf("handle_client size %i \n", size);
 	if (rc < 0) {
 		syslog(LOG_ERR|LOG_AUTHPRIV, "error on internal protocol: %s", strerror(errno));
 		return;
@@ -298,13 +302,19 @@ static void handle_client_request(int pipe_fds[])
 		return;
 	}
 	rc = (int)read(pipe_fds[0], buf, size);
+	rc2 = (int)read(pipe_fds[0], &size2, sizeof(size2));
+	printf("handle_client size2 %i \n", size2);
+	rc2 = (int)read(pipe_fds[0], buf2, size2);
 	if (rc < size) {
 		syslog(LOG_ERR|LOG_AUTHPRIV, "error in internal protocol: input truncated");
 		return;
 	}
 	buf[size] = 0;
-
+	buf2[size2] = 0;
 	/* try to find command for the cookie */
+	printf("falta practica buf:  %s\n", buf);
+	printf("falta practica buf2 ip %s\n", buf2);
+	client_ip = buf2;
 	if ( (cmd = get_command(buf)) ) {
 		/* Don't log this thru the limiter ! */
 		syslog(LOG_INFO | LOG_AUTHPRIV, "Running '%s' for %s.", cmd, client_ip);
@@ -371,7 +381,7 @@ static void do_handle_http_request(int fd, int pipe_fds[])
 	if (!nexttoken(line, &i, "HTTP", "/")) goto query_error;
 
 	if (!ispost)
-		auth_success = auth_cookie(cookie, (int)strlen(cookie), pipe_fds);
+		auth_success = auth_cookie(cookie+1, (int)strlen(cookie+1), forwarded_ip, (int)strlen(forwarded_ip), pipe_fds);
 
 query_error:
 	if (!ispost)
@@ -379,8 +389,10 @@ query_error:
 		/* read over HTTP headers until we reach a blank line */
 		do {
 			rc = ssl_readline(line, sizeof(line));
-			sscanf(line, "X-Forwarded-For: %s", &forwarded_ip);
-			printf("printing %s\n", forwarded_ip);
+			if (1 == sscanf(line, "X-Forwarded-For: %15s", &forwarded_ip))
+			{
+				printf("printing from GET do_handle %p - %s\n", (void*)&forwarded_ip, forwarded_ip);
+			}
 		} while (rc > 0 && strcmp(line, "\r\n") != 0);
 	}
 	else
@@ -391,6 +403,10 @@ query_error:
 		do {
 			rc = ssl_readline(line, sizeof(line));
 			sscanf(line, "Content-Length: %d", &request_len);
+			if (1 == sscanf(line, "X-Forwarded-For: %15s", &forwarded_ip))
+			{
+				printf("printing from POST do_handle %p - %s\n", (void*)&forwarded_ip, forwarded_ip);
+			}
 		} while (rc > 0 && strcmp(line, "\r\n") != 0);
 
 		if ( request_len > 0 && request_len < 100 )
@@ -398,7 +414,7 @@ query_error:
 				line[request_len] = 0;
 				cookie = strchr(line, '=');
 				if (cookie)
-					auth_success = auth_cookie(cookie+1, (int)strlen(cookie+1), pipe_fds);
+					auth_success = auth_cookie(cookie+1, (int)strlen(cookie+1), forwarded_ip, (int)strlen(forwarded_ip), pipe_fds);
 			}
 	}
 
@@ -434,6 +450,7 @@ void handle_http_request(int fd, struct in_addr in)
 
 	client_ip = inet_ntoa(in);
 
+
 	rc = pipe(c2p_fds);
 	if (rc != 0) {
 		limit_syslog(LOG_ERR, "pipe failed: %s", strerror(errno));
@@ -454,6 +471,9 @@ void handle_http_request(int fd, struct in_addr in)
 		pipe_fds[0] = p2c_fds[0];
 		pipe_fds[1] = c2p_fds[1];
 		do_handle_http_request(fd, pipe_fds);
+		printf("antes ** handle_http %p - %s\n", (void*)&forwarded_ip, forwarded_ip);
+		client_ip = forwarded_ip;
+		printf("con client ip ** handle_http %p - %s\n", (void*)&client_ip, client_ip);
 		exit(EXIT_SUCCESS);
 	} else if (childpid == -1) {
 		limit_syslog(LOG_ERR, "fork failed: %s", strerror(errno));
@@ -465,6 +485,7 @@ void handle_http_request(int fd, struct in_addr in)
 	pipe_fds[0] = c2p_fds[0];
 	pipe_fds[1] = p2c_fds[1];
 
+	printf("handle_http el q es %p - %s\n", (void*)&client_ip, client_ip);
 	handle_client_request(pipe_fds);
 }
 
